@@ -89,7 +89,7 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str, nickname: str):
         while True:
             data = await websocket.receive_text()
             message_data = json.dumps({"nickname": nickname, "content": data})
-            
+
             # Lưu tin nhắn vào Firebase và SQLite
             save_message_to_firebase(room_id, nickname, data)
             save_message_to_sqlite(room_id, nickname, data)

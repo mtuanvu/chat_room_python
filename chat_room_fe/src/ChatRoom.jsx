@@ -12,6 +12,39 @@ const ChatRoom = () => {
     const [inRoom, setInRoom] = useState(false);
     const ws = useRef(null);
 
+    useEffect(() => {
+        // Tải thông tin phòng từ localStorage nếu có
+        const storedRoomId = localStorage.getItem("roomId");
+        const storedNickname = localStorage.getItem("nickname");
+        const storedMessages = localStorage.getItem("messages");
+
+        if (storedRoomId && storedNickname) {
+            setRoomId(storedRoomId);
+            setNickname(storedNickname);
+            setInRoom(true);
+            if (storedMessages) {
+                setMessages(JSON.parse(storedMessages));
+            }
+        }
+
+        // Nếu đã vào phòng trước đó, cố gắng kết nối lại
+        if (inRoom) {
+            ws.current = new WebSocket(`ws://localhost:8000/ws/${roomId}/${nickname}`);
+            ws.current.onopen = () => console.log("Connected to WebSocket server");
+            ws.current.onmessage = (event) => {
+                const messageData = JSON.parse(event.data);
+                setMessages((prev) => [...prev, `${messageData.nickname}: ${messageData.content}`]);
+                // Cập nhật lại lịch sử tin nhắn vào localStorage
+                localStorage.setItem("messages", JSON.stringify([...messages, `${messageData.nickname}: ${messageData.content}`]));
+            };
+            ws.current.onclose = () => console.log("Disconnected from WebSocket server");
+        }
+
+        return () => {
+            if (ws.current) ws.current.close();  // Đóng kết nối WebSocket khi component unmount
+        };
+    }, [inRoom, roomId, nickname]);  // Thêm dependencies cho useEffect
+
     const createRoom = async () => {
         try {
             const response = await fetch("http://localhost:8000/create_room", {
@@ -21,6 +54,9 @@ const ChatRoom = () => {
             });
             if (response.ok) {
                 message.success(`Room ${roomId} created successfully`);
+                // Lưu thông tin phòng vào localStorage
+                localStorage.setItem("roomId", roomId);
+                localStorage.setItem("nickname", nickname);
             } else {
                 message.error("Failed to create room");
             }
@@ -39,14 +75,9 @@ const ChatRoom = () => {
             if (response.ok) {
                 setInRoom(true);
                 loadHistory();
-
-                ws.current = new WebSocket(`ws://localhost:8000/ws/${roomId}/${nickname}`);
-                ws.current.onopen = () => console.log("Connected to WebSocket server");
-                ws.current.onmessage = (event) => {
-                    const messageData = JSON.parse(event.data);
-                    setMessages((prev) => [...prev, `${messageData.nickname}: ${messageData.content}`]);
-                };
-                ws.current.onclose = () => console.log("Disconnected from WebSocket server");
+                // Lưu thông tin phòng vào localStorage
+                localStorage.setItem("roomId", roomId);
+                localStorage.setItem("nickname", nickname);
             } else {
                 message.error("Invalid Room ID or Password");
             }
@@ -59,7 +90,10 @@ const ChatRoom = () => {
         try {
             const response = await fetch(`http://localhost:8000/history/${roomId}`);
             const history = await response.json();
-            setMessages(history.map(msg => `${msg.nickname}: ${msg.content}`));
+            const messageList = history.map(msg => `${msg.nickname}: ${msg.content}`);
+            setMessages(messageList);
+            // Lưu lịch sử tin nhắn vào localStorage
+            localStorage.setItem("messages", JSON.stringify(messageList));
         } catch (error) {
             console.error("Failed to load history:", error);
         }
@@ -70,6 +104,8 @@ const ChatRoom = () => {
             setMessages((prev) => [...prev, `${nickname}: ${input}`]);
             ws.current.send(input);
             setInput("");
+            // Cập nhật lại lịch sử tin nhắn vào localStorage
+            localStorage.setItem("messages", JSON.stringify([...messages, `${nickname}: ${input}`]));
         } else {
             message.warning("WebSocket connection is not open.");
         }
@@ -82,11 +118,15 @@ const ChatRoom = () => {
         setRoomId("");
         setPassword("");
         setNickname("");
+        // Xóa thông tin phòng khỏi localStorage
+        localStorage.removeItem("roomId");
+        localStorage.removeItem("nickname");
+        localStorage.removeItem("messages");
     };
 
     return (
         <div style={{ padding: "20px" }}>
-            <Title level={2}></Title>
+            <Title level={2}>Chat Room</Title>
             {!inRoom ? (
                 <div>
                     <Title level={3}>Create or Join a Room</Title>
