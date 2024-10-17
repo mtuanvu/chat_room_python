@@ -86,7 +86,7 @@ const ChatRoom = () => {
 
     return (
         <div style={{ padding: "20px" }}>
-            <Title level={2}>Chat Room</Title>
+            <Title level={2}></Title>
             {!inRoom ? (
                 <div>
                     <Title level={3}>Create or Join a Room</Title>
